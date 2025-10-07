@@ -72,6 +72,24 @@ export default function ProfileScreen() {
     setRefreshing(false);
   };
 
+  const handleTakePhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (perm.status !== 'granted') {
+      Alert.alert('Permission refusée', 'Nous avons besoin de votre permission pour accéder à la caméra.');
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+      cameraType: ImagePicker.CameraType.front, // Caméra frontale pour selfie
+    });
+    if (!res.canceled && res.assets && res.assets.length > 0) {
+      setAvatarUrl(res.assets[0].uri);
+    }
+  };
+
   const handlePickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (perm.status !== 'granted') {
@@ -86,6 +104,33 @@ export default function ProfileScreen() {
     });
     if (!res.canceled && res.assets && res.assets.length > 0) {
       setAvatarUrl(res.assets[0].uri);
+    }
+  };
+
+  const handleChoosePhotoOption = () => {
+    if (Platform.OS === 'web') {
+      // Sur web, seulement la galerie
+      handlePickImage();
+    } else {
+      // Sur mobile, afficher les options
+      Alert.alert(
+        'Photo de profil',
+        'Choisissez une option',
+        [
+          {
+            text: '📷 Prendre un selfie',
+            onPress: handleTakePhoto,
+          },
+          {
+            text: '🖼️ Choisir depuis la galerie',
+            onPress: handlePickImage,
+          },
+          {
+            text: 'Annuler',
+            style: 'cancel',
+          },
+        ]
+      );
     }
   };
 
@@ -194,12 +239,12 @@ export default function ProfileScreen() {
             )}
             <Pressable
               style={[styles.avatarBadge, { backgroundColor: theme.primary }]}
-              onPress={handlePickImage}
+              onPress={handleChoosePhotoOption}
             >
               <Text style={styles.avatarBadgeText}>📷</Text>
             </Pressable>
           </View>
-          <Pressable style={[styles.changePhotoBtn, { borderColor: theme.primary }]} onPress={handlePickImage}>
+          <Pressable style={[styles.changePhotoBtn, { borderColor: theme.primary }]} onPress={handleChoosePhotoOption}>
             <Text style={[styles.changePhotoBtnText, { color: theme.primary }]}>Changer la photo</Text>
           </Pressable>
         </View>
