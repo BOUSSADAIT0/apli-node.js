@@ -9,9 +9,24 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Cette app utilise votre position pour enregistrer le lieu de travail.",
+        "NSLocationAlwaysUsageDescription": "Cette app utilise votre position pour enregistrer le lieu de travail.",
+        "NSCameraUsageDescription": "Cette app utilise votre caméra pour prendre une photo de profil.",
+        "NSPhotoLibraryUsageDescription": "Cette app accède à vos photos pour sélectionner une photo de profil.",
+        "NSPhotoLibraryAddUsageDescription": "Cette app enregistre des photos dans votre galerie."
+      },
       "supportsTablet": true
     },
     "android": {
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
