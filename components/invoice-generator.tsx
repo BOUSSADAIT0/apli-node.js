@@ -203,10 +203,6 @@ export default function InvoiceGenerator() {
       Alert.alert('Erreur', "Le nom de l'entreprise fournisseur est obligatoire");
       return false;
     }
-    if (!fournisseur.siret.trim()) {
-      Alert.alert('Erreur', 'Le SIRET du fournisseur est obligatoire');
-      return false;
-    }
     if (!fournisseur.autoEntrepreneurName.trim()) {
       Alert.alert('Erreur', "Le nom de l'auto-entrepreneur est obligatoire");
       return false;

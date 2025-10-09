@@ -38,10 +38,8 @@ export async function seedDatabase() {
 
     // Créer un utilisateur de test
     const hashedPassword = bcrypt.hashSync('password123', 10);
-    const userId = 'test-user-' + Date.now();
 
     const user = new User({
-      _id: userId,
       firstName: 'Boussad',
       lastName: 'AIT DJOUDI OUFELLA',
       email: 'boussad@example.com',
@@ -51,11 +49,11 @@ export async function seedDatabase() {
     });
 
     await user.save();
+    const userId = user._id;
 
     // Créer des entrées de travail de test
     const workEntries = [
       {
-        _id: 'entry-1-' + Date.now(),
         userId: userId,
         startDate: '2025-01-06',
         startTime: '09:00',
@@ -79,7 +77,6 @@ export async function seedDatabase() {
         comment: 'Journée productive',
       },
       {
-        _id: 'entry-2-' + Date.now() + 1,
         userId: userId,
         startDate: '2025-01-07',
         startTime: '10:00',
@@ -103,7 +100,6 @@ export async function seedDatabase() {
         comment: 'Réunion client',
       },
       {
-        _id: 'entry-3-' + Date.now() + 2,
         userId: userId,
         startDate: '2025-01-08',
         startTime: '09:30',

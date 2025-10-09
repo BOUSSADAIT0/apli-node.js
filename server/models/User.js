@@ -1,10 +1,6 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-  _id: {
-    type: String,
-    required: true,
-  },
   firstName: {
     type: String,
     required: true,
@@ -32,6 +28,18 @@ const userSchema = new mongoose.Schema({
   },
   avatarUrl: {
     type: String,
+    default: null,
+  },
+  address: {
+    type: String,
+    default: null,
+  },
+  siret: {
+    type: String,
+    default: null,
+  },
+  defaultHourlyRate: {
+    type: Number,
     default: null,
   },
 }, {

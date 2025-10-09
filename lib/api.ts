@@ -1,4 +1,4 @@
-import { cacheGet, cacheSet } from './cache';
+import { cacheClear, cacheGet, cacheSet } from './cache';
 import { showError } from './toast';
 
 export type ApiUser = {
@@ -107,17 +107,27 @@ export async function createUser(firstName: string, lastName: string, email?: st
 }
 
 export async function createWorkEntry(entry: Omit<ApiWorkEntry, 'id'>) {
-  return http<ApiWorkEntry>('/work-entries', {
+  const result = await http<ApiWorkEntry>('/work-entries', {
     method: 'POST',
     body: JSON.stringify(entry),
   });
+  
+  // Nettoyer le cache pour forcer le rechargement
+  const cacheKey = `work-entries-${entry.userId}`;
+  await cacheClear(cacheKey);
+  
+  return result;
 }
 
-export async function listWorkEntries(userId?: string) {
+export async function listWorkEntries(userId?: string, skipCache = false) {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
   const cacheKey = `work-entries-${userId || 'all'}`;
-  const cached = await cacheGet<ApiWorkEntry[]>(cacheKey);
-  if (cached) return cached;
+  
+  if (!skipCache) {
+    const cached = await cacheGet<ApiWorkEntry[]>(cacheKey);
+    if (cached) return cached;
+  }
+  
   const data = await http<ApiWorkEntry[]>(`/work-entries${query}`);
   await cacheSet(cacheKey, data);
   return data;
@@ -132,16 +142,30 @@ export async function login(data: { email: string; password: string }) {
 }
 
 export async function updateWorkEntry(id: string, entry: Partial<Omit<ApiWorkEntry, 'id'>>) {
-  return http<ApiWorkEntry>(`/work-entries/${encodeURIComponent(id)}`, {
+  const result = await http<ApiWorkEntry>(`/work-entries/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(entry),
   });
+  
+  // Nettoyer le cache pour forcer le rechargement
+  if (entry.userId) {
+    const cacheKey = `work-entries-${entry.userId}`;
+    await cacheClear(cacheKey);
+  }
+  
+  return result;
 }
 
 export async function deleteWorkEntry(id: string) {
-  return http<void>(`/work-entries/${encodeURIComponent(id)}`, {
+  const result = await http<void>(`/work-entries/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
+  
+  // Nettoyer tous les caches de work-entries car on ne connaît pas le userId
+  // Cette approche est plus robuste
+  await cacheClear('work-entries-all');
+  
+  return result;
 }
 
 export async function updateUser(id: string, data: Partial<ApiUser>) {
@@ -153,12 +177,14 @@ export async function deleteUser(id: string) {
 }
 
 export async function invoicePreview(params: { userId: string; from?: string; to?: string; hourlyRate?: number }) {
-  const qs = new URLSearchParams();
-  qs.set('userId', params.userId);
-  if (params.from) qs.set('from', params.from);
-  if (params.to) qs.set('to', params.to);
-  if (params.hourlyRate != null) qs.set('hourlyRate', String(params.hourlyRate));
-  return http<{ userId: string; from: string | null; to: string | null; totalHours: number; totalAmount: number; lines: { entryId: string; date: string; hours: number; amount: number; category: string; rate: number; }[] }>(`/invoices/preview?${qs.toString()}`);
+  return http<{ userId: string; from: string | null; to: string | null; totalHours: number; totalAmount: number; lines: { entryId: string; date: string; hours: number; amount: number; category: string; rate: number; }[] }>(`/invoice-preview`, {
+    method: 'POST',
+    body: JSON.stringify({
+      startDate: params.from,
+      endDate: params.to,
+      hourlyRate: params.hourlyRate || 0,
+    }),
+  });
 }
 
 

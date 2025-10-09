@@ -1,12 +1,8 @@
 import mongoose from 'mongoose';
 
 const workEntrySchema = new mongoose.Schema({
-  _id: {
-    type: String,
-    required: true,
-  },
   userId: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
   },

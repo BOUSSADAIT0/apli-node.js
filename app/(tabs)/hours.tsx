@@ -1,7 +1,8 @@
-import WorkEntryForm from '@/components/work-entry-form';
+import WorkEntryFormSimple from '@/components/work-entry-form-simple';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createWorkEntry, deleteWorkEntry, getCurrentUser, listWorkEntries, updateWorkEntry } from '@/lib/api';
+import { blendColors, getActivities, getClients, type Activity, type Client } from '@/lib/clients';
 import { storage } from '@/lib/storage';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -21,14 +22,28 @@ export default function HoursScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  
+  // Clients et Activités pour les couleurs
+  const [clients, setClients] = useState<Client[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     loadUser();
+    loadClientsAndActivities();
   }, []);
 
   useEffect(() => {
-    if (userId) reload();
+    if (userId) reload(true); // Toujours charger depuis le serveur au démarrage
   }, [userId]);
+
+  async function loadClientsAndActivities() {
+    const [clientsData, activitiesData] = await Promise.all([
+      getClients(),
+      getActivities(),
+    ]);
+    setClients(clientsData);
+    setActivities(activitiesData);
+  }
 
   async function loadUser() {
     try {
@@ -47,12 +62,22 @@ export default function HoursScreen() {
     } catch {}
   }
 
-  async function reload() {
+  async function reload(skipCache = false) {
     if (!userId) return;
     setLoading(true);
     try {
-      const data = await listWorkEntries(userId);
+      console.log('🔄 Rechargement des heures de travail...', { userId, skipCache });
+      const data = await listWorkEntries(userId, skipCache);
+      console.log('✅ Heures chargées:', data.length);
+      console.log('📊 Dernières entrées:', data.slice(0, 3).map(e => ({ 
+        id: e.id, 
+        date: e.startDate, 
+        client: e.clientName,
+        activity: e.activityName 
+      })));
       setItems(data);
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement:', error);
     } finally {
       setLoading(false);
     }
@@ -213,7 +238,7 @@ export default function HoursScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView 
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => reload(true)} />}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
@@ -282,14 +307,38 @@ export default function HoursScreen() {
                   const badge = totalsByDate[key];
                   const isToday = formatDateKey(new Date()) === key;
                   
-                  return (
+                  // Calculer la couleur mixte (client + activité)
+                  let cellColor = theme.primary + '20'; // Couleur par défaut
+                  if (hasEntries && entriesByDate[key]) {
+                    const firstEntry = entriesByDate[key][0];
+                    const client = clients.find(c => c.id === firstEntry.clientId);
+                    const activity = activities.find(a => a.id === firstEntry.activityId);
+                    
+                    if (client && activity) {
+                      cellColor = blendColors(client.color, activity.color) + '40'; // 40 = opacité
+                    } else if (client) {
+                      cellColor = client.color + '40';
+                    } else if (activity) {
+                      cellColor = activity.color + '40';
+    }
+  }
+
+  return (
                     <Pressable
                       key={di}
                       style={[
                         styles.cell,
                         { backgroundColor: theme.background },
-                        hasEntries && [styles.cellMarked, { backgroundColor: theme.primary + '20' }],
-                        isSelected && [styles.cellSelected, { backgroundColor: theme.primary, borderColor: theme.primary }],
+                        hasEntries && [styles.cellMarked, { backgroundColor: cellColor }],
+                        isSelected && [styles.cellSelected, { 
+                          backgroundColor: hasEntries && entriesByDate[key] && (() => {
+                            const firstEntry = entriesByDate[key][0];
+                            const client = clients.find(c => c.id === firstEntry.clientId);
+                            const activity = activities.find(a => a.id === firstEntry.activityId);
+                            return client && activity ? blendColors(client.color, activity.color) : theme.primary;
+                          })(),
+                          borderColor: theme.primary 
+                        }],
                         isToday && !isSelected && [styles.cellToday, { borderColor: theme.warning }],
                       ]}
                       onPress={() => setSelectedDate(isSelected ? null : key)}
@@ -303,7 +352,7 @@ export default function HoursScreen() {
                         {date.getDate()}
                       </Text>
                       {badge && !isSelected && (
-                        <Text style={[styles.cellBadge, { color: theme.primary }]}>
+                        <Text style={[styles.cellBadge, { color: '#FFFFFF', fontWeight: '700' }]}>
                           {badge.hours.toFixed(1)}h
                         </Text>
                       )}
@@ -387,7 +436,8 @@ export default function HoursScreen() {
                           onPress: async () => {
                             try {
                               await deleteWorkEntry(item.id);
-                              await reload();
+                              // Forcer le rechargement depuis le serveur (skipCache = true)
+                              await reload(true);
                               Alert.alert('✅ Succès', 'Entrée supprimée');
                             } catch (e) {
                               Alert.alert('❌ Erreur', String(e));
@@ -449,26 +499,33 @@ export default function HoursScreen() {
               </Pressable>
             </View>
             <ScrollView>
-              <WorkEntryForm
-                submitting={submitting}
-                onSubmit={async (data) => {
-                  if (!userId) {
+              <WorkEntryFormSimple
+        submitting={submitting}
+        onSubmit={async (data) => {
+          if (!userId) {
                     Alert.alert('❌ Erreur', 'Vous devez être connecté');
-                    return;
-                  }
-                  try {
-                    setSubmitting(true);
-                    await createWorkEntry({ userId, ...data });
-                    await reload();
+            return;
+          }
+          try {
+            setSubmitting(true);
+                    console.log('🔄 Création d\'une nouvelle entrée...', { userId, data });
+            await createWorkEntry({ userId, ...data });
+                    console.log('✅ Entrée créée, rechargement des données...');
+                    // Forcer le rechargement depuis le serveur (skipCache = true)
+                    await reload(true);
+                    console.log('✅ Données rechargées');
+                    // Recharger les clients/activités aussi
+                    await loadClientsAndActivities();
                     setShowAddForm(false);
                     Alert.alert('✅ Succès', 'Entrée ajoutée avec succès');
-                  } catch (e) {
+          } catch (e) {
+                    console.error('❌ Erreur lors de la création:', e);
                     Alert.alert('❌ Erreur', String(e));
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
-              />
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+      />
             </ScrollView>
           </View>
         </View>
@@ -483,10 +540,10 @@ export default function HoursScreen() {
               <Pressable onPress={() => setEditing(null)}>
                 <Text style={[styles.modalClose, { color: theme.muted }]}>✕</Text>
               </Pressable>
-            </View>
+          </View>
             <ScrollView>
               {editing && (
-                <WorkEntryForm
+                <WorkEntryFormSimple
                   submitting={submitting}
                   initialValues={editing}
                   submitLabel="Enregistrer"
@@ -495,7 +552,10 @@ export default function HoursScreen() {
                       setSubmitting(true);
                       await updateWorkEntry(editing.id, data);
                       setEditing(null);
-                      await reload();
+                      // Forcer le rechargement depuis le serveur (skipCache = true)
+                      await reload(true);
+                      // Recharger les clients/activités aussi
+                      await loadClientsAndActivities();
                       Alert.alert('✅ Succès', 'Entrée modifiée avec succès');
                     } catch (e) {
                       Alert.alert('❌ Erreur', String(e));

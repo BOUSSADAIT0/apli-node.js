@@ -6,16 +6,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    Platform,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Image,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 
 export default function ProfileScreen() {
@@ -86,7 +86,10 @@ export default function ProfileScreen() {
       cameraType: ImagePicker.CameraType.front, // Caméra frontale pour selfie
     });
     if (!res.canceled && res.assets && res.assets.length > 0) {
-      setAvatarUrl(res.assets[0].uri);
+      const newUri = res.assets[0].uri;
+      setAvatarUrl(newUri);
+      // Sauvegarder automatiquement la photo
+      await saveAvatarUrl(newUri);
     }
   };
 
@@ -103,7 +106,31 @@ export default function ProfileScreen() {
       aspect: [1, 1],
     });
     if (!res.canceled && res.assets && res.assets.length > 0) {
-      setAvatarUrl(res.assets[0].uri);
+      const newUri = res.assets[0].uri;
+      setAvatarUrl(newUri);
+      // Sauvegarder automatiquement la photo
+      await saveAvatarUrl(newUri);
+    }
+  };
+
+  // Fonction pour sauvegarder l'avatar automatiquement
+  const saveAvatarUrl = async (uri: string) => {
+    try {
+      const cur = getCurrentUser();
+      if (!cur) return;
+
+      const updated = await updateUser(cur.id, {
+        avatarUrl: uri,
+      });
+      setCurrentUser(updated);
+
+      // Sauvegarder dans le storage
+      await storage.setItem('user', JSON.stringify(updated));
+      
+      console.log('✅ Photo de profil sauvegardée:', uri);
+    } catch (error) {
+      console.error('❌ Erreur lors de la sauvegarde de la photo:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder la photo');
     }
   };
 

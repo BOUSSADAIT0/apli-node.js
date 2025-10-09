@@ -7,19 +7,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 
 type PeriodType = 'week' | 'month' | 'year' | 'custom';
-
-type LocationData = {
-  id: string;
-  city?: string;
-  address?: string;
-  latitude?: number;
-  longitude?: number;
-  clientName?: string;
-  count: number;
-};
 
 export default function RecapScreen() {
   const colorScheme = useColorScheme();
@@ -136,61 +125,6 @@ export default function RecapScreen() {
   }, [items, period, periods, rate]);
 
   // Extraction des emplacements uniques avec coordonnées GPS
-  const locations = useMemo(() => {
-    const locMap: Record<string, LocationData> = {};
-    
-    filteredData.entries.forEach(e => {
-      if (e.location?.latitude && e.location?.longitude) {
-        const key = `${e.location.latitude},${e.location.longitude}`;
-        
-        if (!locMap[key]) {
-          locMap[key] = {
-            id: key,
-            city: e.location.city,
-            address: e.location.address,
-            latitude: e.location.latitude,
-            longitude: e.location.longitude,
-            clientName: e.location.city || e.location.address || 'Lieu inconnu',
-            count: 0,
-          };
-        }
-        locMap[key].count += 1;
-      }
-    });
-
-    return Object.values(locMap);
-  }, [filteredData]);
-
-  // Calculer le centre de la carte (moyenne des positions)
-  const mapRegion = useMemo(() => {
-    if (locations.length === 0) {
-      // Paris par défaut
-      return {
-        latitude: 48.8566,
-        longitude: 2.3522,
-        latitudeDelta: 0.5,
-        longitudeDelta: 0.5,
-      };
-    }
-
-    const avgLat = locations.reduce((sum, loc) => sum + (loc.latitude || 0), 0) / locations.length;
-    const avgLon = locations.reduce((sum, loc) => sum + (loc.longitude || 0), 0) / locations.length;
-
-    // Calculer le delta pour inclure tous les points
-    const latitudes = locations.map(l => l.latitude || 0);
-    const longitudes = locations.map(l => l.longitude || 0);
-    const maxLat = Math.max(...latitudes);
-    const minLat = Math.min(...latitudes);
-    const maxLon = Math.max(...longitudes);
-    const minLon = Math.min(...longitudes);
-
-    return {
-      latitude: avgLat,
-      longitude: avgLon,
-      latitudeDelta: Math.max(0.05, (maxLat - minLat) * 1.5),
-      longitudeDelta: Math.max(0.05, (maxLon - minLon) * 1.5),
-    };
-  }, [locations]);
 
   // Répartition par catégorie
   const byCategory = useMemo(() => {
@@ -416,66 +350,6 @@ export default function RecapScreen() {
           </View>
         </View>
 
-        {/* Carte des emplacements clients */}
-        {locations.length > 0 && (
-          <View style={[styles.mapSection, { backgroundColor: theme.card }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              🗺️ Carte des emplacements ({locations.length} lieu{locations.length > 1 ? 'x' : ''})
-            </Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.muted }]}>
-              Visualisez où vous avez travaillé
-            </Text>
-            
-            <View style={styles.mapContainer}>
-              <MapView
-                style={styles.map}
-                provider={PROVIDER_DEFAULT}
-                initialRegion={mapRegion}
-                showsUserLocation={false}
-                showsMyLocationButton={false}
-              >
-                {locations.map((loc) => (
-                  <Marker
-                    key={loc.id}
-                    coordinate={{
-                      latitude: loc.latitude || 0,
-                      longitude: loc.longitude || 0,
-                    }}
-                    title={loc.clientName}
-                    description={`${loc.count} jour${loc.count > 1 ? 's' : ''} de travail`}
-                    pinColor={colorScheme === 'dark' ? '#3B82F6' : '#EF4444'}
-                  />
-                ))}
-              </MapView>
-            </View>
-
-            {/* Liste des emplacements */}
-            <View style={styles.locationsList}>
-              {locations.map((loc) => (
-                <View key={loc.id} style={[styles.locationItem, { backgroundColor: theme.background }]}>
-                  <View style={styles.locationIcon}>
-                    <Text style={styles.locationIconText}>📍</Text>
-                  </View>
-                  <View style={styles.locationInfo}>
-                    <Text style={[styles.locationName, { color: theme.text }]}>
-                      {loc.city || 'Ville inconnue'}
-                    </Text>
-                    {loc.address && (
-                      <Text style={[styles.locationAddress, { color: theme.muted }]} numberOfLines={1}>
-                        {loc.address}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={[styles.locationBadge, { backgroundColor: theme.primary + '20' }]}>
-                    <Text style={[styles.locationBadgeText, { color: theme.primary }]}>
-                      {loc.count} jour{loc.count > 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
 
         {/* Répartition par catégorie */}
         {byCategory.length > 0 && (
@@ -725,67 +599,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
-  },
-  mapSection: {
-    marginHorizontal: 20,
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  mapContainer: {
-    height: 300,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  locationsList: {
-    gap: 12,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    gap: 12,
-  },
-  locationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#3B82F620',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locationIconText: {
-    fontSize: 20,
-  },
-  locationInfo: {
-    flex: 1,
-  },
-  locationName: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  locationAddress: {
-    fontSize: 13,
-  },
-  locationBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  locationBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

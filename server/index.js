@@ -142,11 +142,9 @@ app.post('/auth/signup', async (req, res) => {
 
     // Hasher le mot de passe
     const passwordHash = bcrypt.hashSync(password, 10);
-    const userId = 'u_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
 
     // Créer l'utilisateur
     const user = new User({
-      _id: userId,
       firstName,
       lastName,
       email,
@@ -155,6 +153,7 @@ app.post('/auth/signup', async (req, res) => {
     await user.save();
 
     // Générer le token
+    const userId = user._id.toString();
     const token = jwt.sign({ userId, email }, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
@@ -224,7 +223,17 @@ app.get('/users/me', authMiddleware, async (req, res) => {
 
 app.put('/users/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  if (id !== req.user.userId) {
+  
+  // Conversion pour comparaison (ObjectId -> String)
+  const paramId = String(id);
+  const tokenUserId = String(req.user.userId);
+  
+  console.log('🔧 PUT /users/:id');
+  console.log('   Param ID:', paramId);
+  console.log('   Token userId:', tokenUserId);
+  console.log('   Match:', paramId === tokenUserId);
+  
+  if (paramId !== tokenUserId) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -234,12 +243,15 @@ app.put('/users/:id', authMiddleware, async (req, res) => {
     const user = await User.findByIdAndUpdate(
       id,
       { firstName, lastName, email, phone, avatarUrl },
-      { new: true }
+      { new: true, runValidators: true }
     );
     
     if (!user) {
+      console.log('❌ User not found with ID:', id);
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    console.log('✅ User updated:', user.email);
 
     res.json({
       id: user._id,
@@ -275,16 +287,15 @@ app.post('/work-entries', authMiddleware, async (req, res) => {
   try {
     const body = workEntrySchema.parse(req.body);
 
-    if (body.userId !== req.user.userId) {
+    if (String(body.userId) !== String(req.user.userId)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const entryId = 'e_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
     const location = body.location || {};
 
     const entry = new WorkEntry({
-      _id: entryId,
-      userId: body.userId,
+      // ✅ Pas de _id = Mongoose crée un ObjectId automatiquement
+      userId: req.user.userId, // ✅ Utiliser l'ID du token au lieu du body
       startDate: body.startDate,
       startTime: body.startTime,
       endDate: body.endDate,
@@ -402,7 +413,8 @@ app.put('/work-entries/:id', authMiddleware, async (req, res) => {
   if (!entry) {
     return res.status(404).json({ error: 'Entry not found' });
   }
-  if (entry.userId !== req.user.userId) {
+  // Comparer en string pour éviter les problèmes ObjectId vs String
+  if (String(entry.userId) !== String(req.user.userId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -468,7 +480,8 @@ app.delete('/work-entries/:id', authMiddleware, async (req, res) => {
   if (!entry) {
     return res.status(404).json({ error: 'Entry not found' });
   }
-  if (entry.userId !== req.user.userId) {
+  // Comparer en string pour éviter les problèmes ObjectId vs String
+  if (String(entry.userId) !== String(req.user.userId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -507,9 +520,19 @@ app.post('/invoice-preview', authMiddleware, async (req, res) => {
   const total = totalHours * (hourlyRate || 0);
 
   res.json({
-    items,
+    userId: req.user.userId,
+    from: startDate,
+    to: endDate,
     totalHours,
-    total,
+    totalAmount: total,
+    lines: items.map((item, index) => ({
+      entryId: `entry_${index}`,
+      date: item.date,
+      hours: item.hours,
+      amount: item.amount,
+      category: 'standard',
+      rate: item.rate,
+    })),
   });
 });
 
