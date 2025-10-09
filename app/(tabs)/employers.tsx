@@ -1,3 +1,5 @@
+import AddressAutocomplete from '@/components/address-autocomplete';
+import ClientMapWeb from '@/components/client-map-web';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ACTIVITY_COLORS, addActivity, addClient, CLIENT_COLORS, deleteActivity, deleteClient, getActivities, getClients, updateActivity, updateClient, type Activity, type Client } from '@/lib/clients';
@@ -20,7 +22,7 @@ export default function ClientsScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
   
-  const [activeTab, setActiveTab] = useState<'clients' | 'activities'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'activities' | 'map'>('clients');
   
   // Clients
   const [clients, setClients] = useState<Client[]>([]);
@@ -31,6 +33,8 @@ export default function ClientsScreen() {
   const [clientCity, setClientCity] = useState('');
   const [clientPostalCode, setClientPostalCode] = useState('');
   const [clientSiret, setClientSiret] = useState('');
+  const [clientLatitude, setClientLatitude] = useState<number | undefined>(undefined);
+  const [clientLongitude, setClientLongitude] = useState<number | undefined>(undefined);
   const [clientColor, setClientColor] = useState(CLIENT_COLORS[0]);
   
   // Activités
@@ -71,6 +75,8 @@ export default function ClientsScreen() {
     setClientCity('');
     setClientPostalCode('');
     setClientSiret('');
+    setClientLatitude(undefined);
+    setClientLongitude(undefined);
     setClientColor(CLIENT_COLORS[0]);
     setShowClientModal(true);
   }
@@ -82,6 +88,8 @@ export default function ClientsScreen() {
     setClientCity(client.city || '');
     setClientPostalCode(client.postalCode || '');
     setClientSiret(client.siret || '');
+    setClientLatitude(client.latitude);
+    setClientLongitude(client.longitude);
     setClientColor(client.color);
     setShowClientModal(true);
   }
@@ -100,6 +108,8 @@ export default function ClientsScreen() {
           city: clientCity.trim() || undefined,
           postalCode: clientPostalCode.trim() || undefined,
           siret: clientSiret.trim() || undefined,
+          latitude: clientLatitude,
+          longitude: clientLongitude,
           color: clientColor,
         });
         Alert.alert('✅ Succès', 'Client modifié');
@@ -110,6 +120,8 @@ export default function ClientsScreen() {
           city: clientCity.trim() || undefined,
           postalCode: clientPostalCode.trim() || undefined,
           siret: clientSiret.trim() || undefined,
+          latitude: clientLatitude,
+          longitude: clientLongitude,
           color: clientColor,
         });
         Alert.alert('✅ Succès', 'Client ajouté');
@@ -260,19 +272,33 @@ export default function ClientsScreen() {
               📋 Activités
             </Text>
           </Pressable>
-        </View>
-
-        {/* Bouton Ajouter */}
-        <View style={styles.addButtonContainer}>
           <Pressable
-            style={[styles.addButton, { backgroundColor: theme.primary }]}
-            onPress={activeTab === 'clients' ? openAddClient : openAddActivity}
+            style={[
+              styles.tab,
+              { backgroundColor: theme.card },
+              activeTab === 'map' && [styles.tabActive, { backgroundColor: theme.primary }],
+            ]}
+            onPress={() => setActiveTab('map')}
           >
-            <Text style={styles.addButtonText}>
-              + Ajouter {activeTab === 'clients' ? 'un client' : 'une activité'}
+            <Text style={[styles.tabText, { color: activeTab === 'map' ? '#fff' : theme.muted }]}>
+              🗺️ Carte
             </Text>
           </Pressable>
         </View>
+
+        {/* Bouton Ajouter */}
+        {activeTab !== 'map' && (
+          <View style={styles.addButtonContainer}>
+            <Pressable
+              style={[styles.addButton, { backgroundColor: theme.primary }]}
+              onPress={activeTab === 'clients' ? openAddClient : openAddActivity}
+            >
+              <Text style={styles.addButtonText}>
+                + Ajouter {activeTab === 'clients' ? 'un client' : 'une activité'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Liste CLIENTS */}
         {activeTab === 'clients' && (
@@ -361,6 +387,19 @@ export default function ClientsScreen() {
             )}
           </View>
         )}
+
+        {/* CARTE */}
+        {activeTab === 'map' && (
+          <View style={styles.mapContainer}>
+            <ClientMapWeb 
+              clients={clients}
+              onClientSelect={(client) => {
+                setActiveTab('clients');
+                // Optionnel: scroll vers le client sélectionné
+              }}
+            />
+          </View>
+        )}
       </ScrollView>
 
       {/* Modal CLIENT */}
@@ -393,13 +432,13 @@ export default function ClientsScreen() {
                 </View>
 
                 <View style={styles.modalSection}>
-                  <Text style={[styles.modalLabel, { color: theme.muted }]}>Adresse</Text>
-                  <TextInput
-                    style={[styles.modalInput, { backgroundColor: theme.background, color: theme.text }]}
-                    placeholder="Ex: 12 Rue de la Paix"
-                    placeholderTextColor={theme.muted}
-                    value={clientAddress}
-                    onChangeText={setClientAddress}
+                  <AddressAutocomplete
+                    address={clientAddress}
+                    onAddressChange={setClientAddress}
+                    onLocationFound={(latitude, longitude) => {
+                      setClientLatitude(latitude);
+                      setClientLongitude(longitude);
+                    }}
                   />
                 </View>
 
@@ -438,6 +477,21 @@ export default function ClientsScreen() {
                     keyboardType="number-pad"
                   />
                 </View>
+
+                {/* Coordonnées GPS */}
+                {(clientLatitude !== undefined && clientLongitude !== undefined) && (
+                  <View style={styles.modalSection}>
+                    <Text style={[styles.modalLabel, { color: theme.muted }]}>📍 Coordonnées GPS</Text>
+                    <View style={styles.coordinatesContainer}>
+                      <Text style={[styles.coordinatesText, { color: theme.text }]}>
+                        Latitude: {clientLatitude.toFixed(6)}
+                      </Text>
+                      <Text style={[styles.coordinatesText, { color: theme.text }]}>
+                        Longitude: {clientLongitude.toFixed(6)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
 
                 <View style={styles.modalSection}>
                   <Text style={[styles.modalLabel, { color: theme.muted }]}>Couleur</Text>
@@ -579,6 +633,7 @@ const styles = StyleSheet.create({
   addButton: { padding: 16, borderRadius: 12, alignItems: 'center' },
   addButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   list: { paddingHorizontal: 20, paddingBottom: 100 },
+  mapContainer: { flex: 1, paddingHorizontal: 20, paddingBottom: 100 },
   card: { padding: 16, borderRadius: 12, marginBottom: 12 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
@@ -612,4 +667,18 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontWeight: '600' },
   saveBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontWeight: '600' },
+  
+  // Coordonnées GPS
+  coordinatesContainer: {
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  coordinatesText: {
+    fontSize: 14,
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
 });

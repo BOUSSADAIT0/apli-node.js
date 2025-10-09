@@ -10,6 +10,8 @@ export type Client = {
   city?: string; // Ville
   postalCode?: string; // Code postal
   siret?: string; // Numéro SIRET du client
+  latitude?: number; // Latitude pour la carte
+  longitude?: number; // Longitude pour la carte
   color: string; // Couleur pour identification visuelle
   description?: string; // Notes additionnelles
 };
